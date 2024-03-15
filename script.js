@@ -55,6 +55,12 @@ app.post("/api/tripDetails", (req, res) => {
   res.status(200).json({ success: true, tripDetails: filteredData, id });
 });
 
+app.post("/api/getPhotos", (req, res) => {
+  const { id } = req.body;
+  console.log(id);
+  res.status(200).json({ success: true });
+});
+
 app.listen(3000, () => {
   console.log("App is running");
 });
