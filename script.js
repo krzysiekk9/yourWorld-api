@@ -28,7 +28,6 @@ const db = knex({
   },
 });
 
-// const upload = multer({ dest: "uploads/" });
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
@@ -86,12 +85,13 @@ app.post("/api/photosUpload", upload.array("files"), (req, res) => {
 
     filesUrl.push(createFileUrl(fileId));
   });
+  console.log("arr", filesUrl);
   if (uploadSucces.every((cur) => cur === true)) {
     db.transaction((trx) => {
       trx
         .insert({
           trip_id: tripId,
-          images_url: filesUrl,
+          url: filesUrl,
         })
         .into("images")
         .returning("trip_id")
@@ -110,11 +110,13 @@ app.post("/api/photosUpload", upload.array("files"), (req, res) => {
               ticket_cost: filteredData.ticketCost,
               trip_type: filteredData.tripType,
             })
-            .then((trip) =>
-              res
-                .status(200)
-                .json({ success: true, tripDetails: filteredData, tripId })
-            );
+            .then((trip) => {
+              res.status(200).json({
+                success: true,
+                tripDetails: filteredData,
+                tripId: tripId[0].trip_id,
+              });
+            });
         })
         .then(trx.commit)
         .catch(trx.rollback);
@@ -137,7 +139,6 @@ app.post("/api/tripDetails", (req, res) => {
   const filteredData = cleanData(data);
   //generating uniqe id for new list item
   const tripId = uuidv4();
-  console.log("!", filteredData);
 
   db("trips")
     .returning("*")
@@ -161,14 +162,20 @@ app.post("/api/tripDetails", (req, res) => {
         .status(400)
         .json({ success: false, message: "Unable to add data to database" })
     );
-
-  // res.status(200).json({ success: true, tripDetails: filteredData, id });
 });
 
-app.post("/api/getPhotos", (req, res) => {
-  const { id } = req.body;
-  console.log(id);
-  res.status(200).json({ success: true });
+app.get("/api/getPhotos/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const imageArr = await db
+      .select("url")
+      .from("images")
+      .where({ trip_id: id });
+    console.log(imageArr);
+    res.status(200).json({ success: true, imageArr });
+  } catch (err) {
+    res.status(400).json({ success: false, message: "Couldn't get images" });
+  }
 });
 
 app.listen(3000, () => {
