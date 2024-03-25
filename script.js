@@ -49,6 +49,11 @@ const cleanData = (data) => {
   }, {});
 };
 
+const cleanDate = (date) => {
+  //changing date format to display only YYYY-MM-DD
+  return date.toISOString().split("T")[0];
+};
+
 app.post("/api/photosUpload", upload.array("files"), (req, res) => {
   console.log("Data and images uploaded");
 
@@ -117,6 +122,8 @@ app.post("/api/photosUpload", upload.array("files"), (req, res) => {
             })
             .then((response) => {
               const cleanResponse = cleanData(response[0]);
+              cleanResponse.date = cleanDate(cleanResponse.date);
+
               res.status(200).json({
                 success: true,
                 tripDetails: cleanResponse,
@@ -167,7 +174,9 @@ app.post("/api/tripDetails", (req, res) => {
       //changing string to boolean
       const cleanResponse = cleanData(response[0]);
 
-      // filteredData.uploadWithImages = filteredData.uploadWithImages === "true";
+      //changing date format to display only YYYY-MM-DD
+      cleanResponse.date = cleanDate(cleanResponse.date);
+
       res
         .status(200)
         .json({ success: true, tripDetails: cleanResponse, tripId });
@@ -198,7 +207,11 @@ app.get("/api/getTrips", async (req, res) => {
     //getting all trips from DB
     const trips = await db.select("*").from("trips");
     //cleaning data
-    const cleanedData = trips.map((trip) => cleanData(trip));
+    const cleanedData = trips.map((trip) => {
+      trip.date = cleanDate(trip.date);
+      return cleanData(trip);
+    });
+    console.log(cleanedData);
     res.status(200).json({ success: true, trips: cleanedData });
   } catch (err) {
     res
