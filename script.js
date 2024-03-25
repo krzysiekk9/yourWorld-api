@@ -211,12 +211,27 @@ app.get("/api/getTrips", async (req, res) => {
       trip.date = cleanDate(trip.date);
       return cleanData(trip);
     });
-    console.log(cleanedData);
     res.status(200).json({ success: true, trips: cleanedData });
   } catch (err) {
     res
       .status(400)
       .json({ success: false, message: "Unable to get trips from database" });
+  }
+});
+
+app.get("/api/getCoords/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const coords = await db
+      .select("lat", "lng")
+      .from("trips")
+      .where({ trip_id: id });
+
+    res.status(200).json({ success: true, coords });
+  } catch (err) {
+    res
+      .status(400)
+      .json({ success: false, message: "Unable to get coords from database" });
   }
 });
 
