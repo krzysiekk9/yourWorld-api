@@ -40,7 +40,9 @@ app.use(express.urlencoded({ extended: false }));
 
 const cleanData = (data) => {
   return Object.entries(data).reduce((acc, [key, value]) => {
-    if (value !== "") {
+    if (value === "" || value === null) {
+      return acc;
+    } else {
       acc[key] = value;
     }
     return acc;
@@ -99,7 +101,7 @@ app.post("/api/photosUpload", upload.array("files"), (req, res) => {
           return trx("trips")
             .returning("*")
             .insert({
-              tripid: tripId[0].trip_id,
+              trip_id: tripId[0].trip_id,
               name: filteredData.name,
               date: filteredData.date,
               duration: filteredData.duration,
@@ -109,11 +111,15 @@ app.post("/api/photosUpload", upload.array("files"), (req, res) => {
               average_fuel_consumption: filteredData.avgFuel,
               ticket_cost: filteredData.ticketCost,
               trip_type: filteredData.tripType,
+              lat: filteredData.lat,
+              lng: filteredData.lng,
+              with_images: filteredData.uploadWithImages,
             })
-            .then((trip) => {
+            .then((response) => {
+              const cleanResponse = cleanData(response[0]);
               res.status(200).json({
                 success: true,
-                tripDetails: filteredData,
+                tripDetails: cleanResponse,
                 tripId: tripId[0].trip_id,
               });
             });
@@ -143,7 +149,7 @@ app.post("/api/tripDetails", (req, res) => {
   db("trips")
     .returning("*")
     .insert({
-      tripid: tripId,
+      trip_id: tripId,
       name: filteredData.name,
       date: filteredData.date,
       duration: filteredData.duration,
@@ -153,10 +159,19 @@ app.post("/api/tripDetails", (req, res) => {
       average_fuel_consumption: filteredData.avgFuel,
       ticket_cost: filteredData.ticketCost,
       trip_type: filteredData.tripType,
+      lat: filteredData.lat,
+      lng: filteredData.lng,
+      with_images: filteredData.uploadWithImages,
     })
-    .then((response) =>
-      res.status(200).json({ success: true, tripDetails: filteredData, tripId })
-    )
+    .then((response) => {
+      //changing string to boolean
+      const cleanResponse = cleanData(response[0]);
+
+      // filteredData.uploadWithImages = filteredData.uploadWithImages === "true";
+      res
+        .status(200)
+        .json({ success: true, tripDetails: cleanResponse, tripId });
+    })
     .catch((err) =>
       res
         .status(400)
@@ -175,6 +190,20 @@ app.get("/api/getPhotos/:id", async (req, res) => {
     res.status(200).json({ success: true, imageArr });
   } catch (err) {
     res.status(400).json({ success: false, message: "Couldn't get images" });
+  }
+});
+
+app.get("/api/getTrips", async (req, res) => {
+  try {
+    //getting all trips from DB
+    const trips = await db.select("*").from("trips");
+    //cleaning data
+    const cleanedData = trips.map((trip) => cleanData(trip));
+    res.status(200).json({ success: true, trips: cleanedData });
+  } catch (err) {
+    res
+      .status(400)
+      .json({ success: false, message: "Unable to get trips from database" });
   }
 });
 
