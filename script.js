@@ -1,10 +1,17 @@
-import express, { response } from "express";
-import multer from "multer";
+import express from "express";
 import cors from "cors";
 import knex from "knex";
-import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
 import AWS from "aws-sdk";
+import { v4 as uuidv4 } from "uuid";
+import { getImages, getTrips, getCoords } from "./controllers/getData.js";
+import { postWithImages, postWithoutImages } from "./controllers/upload.js";
 
+//multer storage congig
+const storage = multer.memoryStorage();
+const uploadFiles = multer({ storage: storage });
+
+//AWS config
 const bucketName = "s3bucket1yourworld2";
 const bucketRegion = "eu-north-1";
 
@@ -17,6 +24,7 @@ const s3 = new AWS.S3({
   },
 });
 
+//DB config
 const db = knex({
   client: "pg",
   connection: {
@@ -28,9 +36,6 @@ const db = knex({
   },
 });
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
 const app = express();
 
 app.use(cors());
@@ -38,6 +43,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+//clean recived form data to put it in DB
 const cleanData = (data) => {
   return Object.entries(data).reduce((acc, [key, value]) => {
     if (value === "" || value === null) {
@@ -49,192 +55,37 @@ const cleanData = (data) => {
   }, {});
 };
 
+//changing date format to display only YYYY-MM-DD
 const cleanDate = (date) => {
-  //changing date format to display only YYYY-MM-DD
   return date.toISOString().split("T")[0];
 };
 
-app.post("/api/photosUpload", upload.array("files"), (req, res) => {
-  console.log("Data and images uploaded");
+app.post("/api/upload/withImages", uploadFiles.array("files"), (req, res) =>
+  postWithImages(
+    req,
+    res,
+    bucketName,
+    bucketRegion,
+    s3,
+    db,
+    cleanData,
+    cleanDate,
+    uuidv4
+  )
+);
 
-  const data = req.body;
-  const files = req.files;
-  const filteredData = cleanData(data);
-  const tripId = uuidv4();
-  let filesUrl = [];
-  let uploadSucces = [];
+app.post("/api/upload/withoutImages", (req, res) =>
+  postWithoutImages(req, res, cleanData, uuidv4, db, cleanDate)
+);
 
-  const createFileUrl = (id) => {
-    return `https://${bucketName}.s3.${bucketRegion}.amazonaws.com/${id}`;
-  };
+app.get("/api/getData/photos/:id", (req, res, db) => getImages(req, res, db));
 
-  files.forEach((file) => {
-    const fileId = uuidv4();
+app.get("/api/getData/trips", (req, res) =>
+  getTrips(req, res, db, cleanData, cleanDate)
+);
 
-    const uploadParams = {
-      Bucket: bucketName,
-      Key: fileId,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-      ACL: "public-read",
-    };
+app.get("/api/getData/coords/:id", (req, res, db) => getCoords(req, res, db));
 
-    s3.upload(uploadParams, function (err, data) {
-      if (err) {
-        console.log("Error", err);
-        uploadSucces.push(false);
-      }
-      if (data) {
-        console.log("Upload Success", data.Location);
-        uploadSucces.push(true);
-      }
-    });
-
-    filesUrl.push(createFileUrl(fileId));
-  });
-  console.log("arr", filesUrl);
-  if (uploadSucces.every((cur) => cur === true)) {
-    db.transaction((trx) => {
-      trx
-        .insert({
-          trip_id: tripId,
-          url: filesUrl,
-        })
-        .into("images")
-        .returning("trip_id")
-        .then((tripId) => {
-          return trx("trips")
-            .returning("*")
-            .insert({
-              trip_id: tripId[0].trip_id,
-              name: filteredData.name,
-              date: filteredData.date,
-              duration: filteredData.duration,
-              distance: filteredData.distance,
-              elevation_gain: filteredData.elevationGain,
-              fuel_cost: filteredData.fuelCost,
-              average_fuel_consumption: filteredData.avgFuel,
-              ticket_cost: filteredData.ticketCost,
-              trip_type: filteredData.tripType,
-              lat: filteredData.lat,
-              lng: filteredData.lng,
-              with_images: filteredData.uploadWithImages,
-            })
-            .then((response) => {
-              const cleanResponse = cleanData(response[0]);
-              cleanResponse.date = cleanDate(cleanResponse.date);
-
-              res.status(200).json({
-                success: true,
-                tripDetails: cleanResponse,
-                tripId: tripId[0].trip_id,
-              });
-            });
-        })
-        .then(trx.commit)
-        .catch(trx.rollback);
-    }).catch((err) =>
-      res
-        .status(400)
-        .json({ success: false, message: "Unable to add new trip to database" })
-    );
-  } else {
-    res
-      .status(400)
-      .json({ success: false, message: "Unable to add images to AWS" });
-  }
-});
-
-app.post("/api/tripDetails", (req, res) => {
-  console.log("Uploaded data without images");
-  const data = req.body;
-
-  const filteredData = cleanData(data);
-  //generating uniqe id for new list item
-  const tripId = uuidv4();
-
-  db("trips")
-    .returning("*")
-    .insert({
-      trip_id: tripId,
-      name: filteredData.name,
-      date: filteredData.date,
-      duration: filteredData.duration,
-      distance: filteredData.distance,
-      elevation_gain: filteredData.elevationGain,
-      fuel_cost: filteredData.fuelCost,
-      average_fuel_consumption: filteredData.avgFuel,
-      ticket_cost: filteredData.ticketCost,
-      trip_type: filteredData.tripType,
-      lat: filteredData.lat,
-      lng: filteredData.lng,
-      with_images: filteredData.uploadWithImages,
-    })
-    .then((response) => {
-      //changing string to boolean
-      const cleanResponse = cleanData(response[0]);
-
-      //changing date format to display only YYYY-MM-DD
-      cleanResponse.date = cleanDate(cleanResponse.date);
-
-      res
-        .status(200)
-        .json({ success: true, tripDetails: cleanResponse, tripId });
-    })
-    .catch((err) =>
-      res
-        .status(400)
-        .json({ success: false, message: "Unable to add data to database" })
-    );
-});
-
-app.get("/api/getPhotos/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const imageArr = await db
-      .select("url")
-      .from("images")
-      .where({ trip_id: id });
-    console.log(imageArr);
-    res.status(200).json({ success: true, imageArr });
-  } catch (err) {
-    res.status(400).json({ success: false, message: "Couldn't get images" });
-  }
-});
-
-app.get("/api/getTrips", async (req, res) => {
-  try {
-    //getting all trips from DB
-    const trips = await db.select("*").from("trips");
-    //cleaning data
-    const cleanedData = trips.map((trip) => {
-      trip.date = cleanDate(trip.date);
-      return cleanData(trip);
-    });
-    res.status(200).json({ success: true, trips: cleanedData });
-  } catch (err) {
-    res
-      .status(400)
-      .json({ success: false, message: "Unable to get trips from database" });
-  }
-});
-
-app.get("/api/getCoords/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const coords = await db
-      .select("lat", "lng")
-      .from("trips")
-      .where({ trip_id: id });
-
-    res.status(200).json({ success: true, coords });
-  } catch (err) {
-    res
-      .status(400)
-      .json({ success: false, message: "Unable to get coords from database" });
-  }
-});
-
-app.listen(3000, () => {
+app.listen(process.env.PORT || 3000, () => {
   console.log("App is running");
 });
