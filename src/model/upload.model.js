@@ -16,6 +16,7 @@ export const queryUploadWithoutImages = (tripId, filteredData) => {
       trip_type: filteredData.tripType,
       lat: filteredData.lat,
       lng: filteredData.lng,
+      with_images: false,
     })
     .then(([response]) => {
       return { success: true, response };
@@ -52,6 +53,7 @@ export const queryUploadWithImages = (tripId, filesUrl, filteredData) => {
               trip_type: filteredData.tripType,
               lat: filteredData.lat,
               lng: filteredData.lng,
+              with_images: true,
             })
             .then(([response]) => {
               return { success: true, response };
