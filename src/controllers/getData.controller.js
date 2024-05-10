@@ -2,10 +2,10 @@ import {
   queryGetImages,
   queryGetTrips,
   queryGetCoords,
-} from "../src/model/getData.model.js";
+} from "../model/getData.model.js";
 
-import { cleanData } from "../src/helpers/cleanData.helper.js";
-import { cleanDate } from "../src/helpers/cleanDate.helper.js";
+import { cleanData } from "../helpers/cleanData.helper.js";
+import { cleanDate } from "../helpers/cleanDate.helper.js";
 
 export const getImages = async (req, res) => {
   try {
