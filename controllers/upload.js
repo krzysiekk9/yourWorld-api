@@ -72,7 +72,6 @@ export const postWithImages = (
               trip_type: filteredData.tripType,
               lat: filteredData.lat,
               lng: filteredData.lng,
-              with_images: filteredData.uploadWithImages,
             })
             .then((response) => {
               const cleanResponse = cleanData(response[0]);
@@ -111,6 +110,7 @@ export const postWithoutImages = (
   const data = req.body;
 
   const filteredData = cleanData(data);
+  console.log("filteredData", filteredData);
   //generating uniqe id for new list item
   const tripId = uuidv4();
 
@@ -129,12 +129,10 @@ export const postWithoutImages = (
       trip_type: filteredData.tripType,
       lat: filteredData.lat,
       lng: filteredData.lng,
-      with_images: filteredData.uploadWithImages,
     })
     .then((response) => {
       //changing string to boolean
       const cleanResponse = cleanData(response[0]);
-
       //changing date format to display only YYYY-MM-DD
       cleanResponse.date = cleanDate(cleanResponse.date);
 

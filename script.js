@@ -60,23 +60,23 @@ const cleanDate = (date) => {
   return date.toISOString().split("T")[0];
 };
 
-app.post("/api/upload/withImages", uploadFiles.array("files"), (req, res) =>
-  postWithImages(
-    req,
-    res,
-    bucketName,
-    bucketRegion,
-    s3,
-    db,
-    cleanData,
-    cleanDate,
-    uuidv4
-  )
-);
+// app.post("/api/upload/withImages", uploadFiles.array("files"), (req, res) =>
+//   postWithImages(
+//     req,
+//     res,
+//     bucketName,
+//     bucketRegion,
+//     s3,
+//     db,
+//     cleanData,
+//     cleanDate,
+//     uuidv4
+//   )
+// );
 
-app.post("/api/upload/withoutImages", (req, res) =>
-  postWithoutImages(req, res, cleanData, uuidv4, db, cleanDate)
-);
+// app.post("/api/upload/withoutImages", (req, res) =>
+//   postWithoutImages(req, res, cleanData, uuidv4, db, cleanDate)
+// );
 
 app.get("/api/getData/photos/:id", (req, res, db) => getImages(req, res, db));
 
@@ -85,6 +85,26 @@ app.get("/api/getData/trips", (req, res) =>
 );
 
 app.get("/api/getData/coords/:id", (req, res, db) => getCoords(req, res, db));
+
+app.post("/api/upload", uploadFiles.any(), (req, res) => {
+  const files = req.files;
+  if (files.length !== 0) {
+    postWithImages(
+      req,
+      res,
+      bucketName,
+      bucketRegion,
+      s3,
+      db,
+      cleanData,
+      cleanDate,
+      uuidv4
+    );
+  } else {
+    console.log("if fired");
+    postWithoutImages(req, res, cleanData, uuidv4, db, cleanDate);
+  }
+});
 
 app.listen(process.env.PORT || 3000, () => {
   console.log("App is running");
